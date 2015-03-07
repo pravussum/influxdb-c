@@ -40,27 +40,34 @@ influxdb_series_set_name(s_influxdb_series *series, char *name)
 char
 **influxdb_series_set_columns(s_influxdb_series *series,
                               char **columns,
+			      unsigned int * column_types,
                               size_t length)
 {
     char **old = series->columns;
     series->columns = columns;
+    series->column_types = column_types;
     series->columns_length = length;
     return old;
 }
 
 char
-influxdb_series_add_colums(s_influxdb_series *series, char *name)
+influxdb_series_add_colums(s_influxdb_series *series, char *name, unsigned int type)
 {
     if (series->columns_length == 0) {
         series->columns = malloc(sizeof (char *) * INFLUXDB_SERIES_STEP);
+	series->column_types = malloc(sizeof (unsigned int));
     } else if (series->columns_length % INFLUXDB_SERIES_STEP == 0) {
         series->columns = realloc(series->columns,
             sizeof (char *) * (series->columns_length + INFLUXDB_SERIES_STEP));
+	series->column_types = realloc(series->column_types,
+	    sizeof (unsigned int) * (series->columns_length + 1));
     }
 
     if (series->columns == NULL)
         return 0;
 
+
+    series->column_types[series->columns_length] = type;
     series->columns[series->columns_length++] = influxdb_strdup(name);
 
     return 1;
@@ -104,6 +111,7 @@ s_influxdb_series
     {
         series->name = influxdb_strdup(name);
         series->columns = NULL;
+	series->column_types = NULL;
         series->points = NULL;
         series->columns_length = 0;
         series->points_length = 0;
@@ -142,7 +150,10 @@ influxdb_series_free(s_influxdb_series *series,
         for (i = 0; i < series->columns_length; i++)
             free(series->columns[i]);
         free(series->columns);
-        series->columns_length = 0;
+
+	free(series->column_types);        
+
+	series->columns_length = 0;
 
         free(series);
     }
@@ -171,15 +182,29 @@ json_object
     /* Points */
     {
         size_t i, j;
+	struct json_object * json_obj;
         json_object *cols = json_object_new_array();
 
         for (i = 0; i < series->points_length; i++)
         {
             json_object *row = json_object_new_array();
 
-            for (j = 0; j < series->columns_length; j++)
-                json_object_array_add(row,
-                    json_object_new_string(series->points[i][j]));
+            for (j = 0; j < series->columns_length; j++) {
+               
+		switch(series->column_types[j]) {
+		    case COLUMN_TYPE_INT:
+			json_obj = json_object_new_int(atoi(series->points[i][j]));
+			break;
+		    case COLUMN_TYPE_DOUBLE:
+			json_obj = json_object_new_double(atof(series->points[i][j]));
+			break;
+		    default:
+			json_obj = json_object_new_string(series->points[i][j]);
+			break;
+		}
+		json_object_array_add(row, json_obj);
+	    
+	    }
 
             json_object_array_add(cols, row);
         }
