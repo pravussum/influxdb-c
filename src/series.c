@@ -56,11 +56,11 @@ influxdb_series_add_colums(s_influxdb_series *series, char *name, unsigned int t
     if (series->columns_length == 0) {
         series->columns = malloc(sizeof (char *) * INFLUXDB_SERIES_STEP);
 	series->column_types = malloc(sizeof (unsigned int));
-    } else if (series->columns_length % INFLUXDB_SERIES_STEP == 0) {
-        series->columns = realloc(series->columns,
-            sizeof (char *) * (series->columns_length + INFLUXDB_SERIES_STEP));
-	series->column_types = realloc(series->column_types,
-	    sizeof (unsigned int) * (series->columns_length + 1));
+    } else {
+        if (series->columns_length % INFLUXDB_SERIES_STEP == 0) {
+        	series->columns = realloc(series->columns, sizeof (char *) * (series->columns_length + INFLUXDB_SERIES_STEP));
+        }
+        series->column_types = realloc(series->column_types, sizeof (unsigned int) * (series->columns_length + 1));	    
     }
 
     if (series->columns == NULL)
